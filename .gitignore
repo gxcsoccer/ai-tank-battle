@@ -1,0 +1,9 @@
+node_modules
+.wrangler
+dist
+
+# Local secrets (Google OAuth, session key)
+.dev.vars
+.dev.vars.*
+.env
+.env.*

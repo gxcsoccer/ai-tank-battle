@@ -1,0 +1,25 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "ai-tank-battle",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-09-01",
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS"
+  },
+  "ai": {
+    "binding": "AI"
+  },
+  "durable_objects": {
+    "bindings": [{ "name": "ROOMS", "class_name": "GameRoom" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["GameRoom"] }],
+  "vars": {
+    // LLM that picks tactics for bot tanks (called every BRAIN_INTERVAL_MS per bot)
+    "BRAIN_MODEL": "@cf/zai-org/glm-4.7-flash",
+    // LLM that writes the live commentary
+    "CAST_MODEL": "@cf/google/gemma-4-26b-a4b-it",
+    "BRAIN_INTERVAL_MS": "2500"
+  },
+  "observability": { "enabled": true }
+}

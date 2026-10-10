@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>AI 坦克大战</title>
+  <meta name="description" content="写下秘籍，让 AI 替你开坦克。基于 Cloudflare Durable Objects 与 Workers AI 的在线坦克大战。" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect x='1' y='3' width='3' height='11' fill='%23f5c542'/><rect x='12' y='3' width='3' height='11' fill='%23f5c542'/><rect x='4' y='5' width='8' height='8' fill='%23ffd966'/><rect x='7' y='0' width='2' height='7' fill='%23a07c1c'/></svg>" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=ZCOOL+QingKe+HuangYou&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <!-- ============ Home ============ -->
+  <main id="home" class="view">
+    <section class="hero">
+      <h1 class="logo"><span class="logo-ai">AI</span>坦克大战</h1>
+      <p class="tagline">写下你的<b>秘籍</b>，让 AI 替你开坦克</p>
+
+      <div class="card home-card">
+        <div id="auth" class="auth"><div class="muted"><span class="spinner"></span> 正在检查登录状态…</div></div>
+        <div id="play" class="play hidden">
+          <button id="btn-create" class="btn primary lg">创建房间</button>
+          <div class="join-row">
+            <input id="code" maxlength="16" placeholder="输入房间号" autocapitalize="characters" spellcheck="false" />
+            <button id="btn-join" class="btn">加入</button>
+          </div>
+        </div>
+        <p id="home-err" class="err" role="alert"></p>
+      </div>
+    </section>
+
+    <section class="steps">
+      <div class="step"><i>1</i><b>拼秘籍</b><span>用词条拼出一段提示词：人设、战术、目标、口头禅。</span></div>
+      <div class="step"><i>2</i><b>AI 鉴定</b><span>Workers AI 鉴定师把秘籍化为属性，写得越好加成越多，作弊会被识破。</span></div>
+      <div class="step"><i>3</i><b>临场指挥</b><span>坦克按秘籍自动作战，你可以随时下达指令扭转战局。</span></div>
+    </section>
+    <p class="powered">Cloudflare Durable Objects · Workers AI · <a href="/privacy.html">隐私政策</a> · <a href="/terms.html">服务条款</a></p>
+  </main>
+
+  <!-- ============ Room ============ -->
+  <main id="room" class="view hidden">
+    <header class="topbar">
+      <div class="brand"><span class="logo-ai">AI</span>坦克大战</div>
+      <div class="top-center" id="top-center"></div>
+      <div class="top-tools">
+        <span id="me-chip"></span>
+        <span class="ai-pill" id="ai-pill"><i class="dot"></i><span>AI</span></span>
+        <button id="btn-copy" class="chip" title="复制邀请链接">房间 <b id="room-code">-----</b></button>
+        <button id="btn-mute" class="chip icon" title="音效" aria-label="音效">♪</button>
+        <button id="btn-leave" class="chip icon" title="离开房间" aria-label="离开房间">✕</button>
+      </div>
+    </header>
+
+    <!-- Lobby -->
+    <section id="lobby" class="lobby">
+      <div class="panel workshop">
+        <div class="panel-head">
+          <h2>秘籍工坊</h2>
+          <span class="muted">坦克全程由 AI 按你的秘籍驾驶</span>
+        </div>
+        <div class="secret-box">
+          <textarea id="secret" maxlength="300" rows="5" placeholder="例如：冷静的狙击手。开局先抢道具，沿墙迂回包抄；血量低于一半立刻撤退回血；集火比分领先的敌人。击杀时大喊“这就是秘籍的力量！”"></textarea>
+          <div class="secret-meta"><span id="secret-state" class="muted"></span><span id="secret-count" class="muted">0/300</span></div>
+        </div>
+        <div id="chips" class="chips"></div>
+        <div class="actions">
+          <button id="btn-dice" class="btn ghost" title="随机拼一段">🎲 随机</button>
+          <button id="btn-clear" class="btn ghost">清空</button>
+          <button id="btn-appraise" class="btn primary">鉴定秘籍</button>
+        </div>
+        <div id="build" class="build"></div>
+      </div>
+
+      <div class="panel roompanel">
+        <div class="panel-head">
+          <h2>战场</h2>
+          <span class="muted" id="host-hint"></span>
+        </div>
+        <div id="settings" class="settings"></div>
+        <div id="seats" class="seats"></div>
+        <div class="share">
+          <input readonly id="share-link" />
+          <button class="btn" id="btn-share">复制邀请</button>
+        </div>
+        <div id="start-area"></div>
+        <div id="spectators" class="muted small"></div>
+      </div>
+    </section>
+
+    <!-- Battle -->
+    <section id="battle" class="battle hidden">
+      <div class="arena">
+        <div class="stage">
+          <canvas id="cv" width="1024" height="704"></canvas>
+          <div id="result" class="overlay hidden"></div>
+        </div>
+      </div>
+      <aside class="side">
+        <div class="panel board-panel">
+          <div class="panel-head"><h3>战况</h3><span class="muted small" id="goal"></span></div>
+          <div id="board" class="board"></div>
+        </div>
+        <div class="panel command hidden" id="command">
+          <div class="panel-head"><h3>指挥台</h3><span class="muted small">指令会覆盖秘籍 12 秒</span></div>
+          <div class="orders" id="orders"></div>
+          <form class="order-form" id="order-form">
+            <input id="order-text" maxlength="40" placeholder="自定义指令，如：去右下角草丛蹲人" autocomplete="off" />
+            <button class="btn" type="submit">下令</button>
+          </form>
+          <div class="cooldown"><i id="cooldown-bar"></i></div>
+        </div>
+        <div class="panel feed-panel">
+          <div class="panel-head"><h3>解说</h3></div>
+          <div id="feed" class="feed" aria-live="polite"></div>
+        </div>
+      </aside>
+    </section>
+
+    <div id="toast" class="toast"></div>
+  </main>
+
+  <script type="module" src="/js/main.js"></script>
+</body>
+</html>
